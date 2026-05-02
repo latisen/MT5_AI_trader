@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 import streamlit as st
+from streamlit_autorefresh import st_autorefresh
 
 from main import build_engine
 from models import RiskSettings, StopLossMethod, TradingMode
@@ -113,6 +114,41 @@ def main() -> None:
     engine.set_settings(settings)
 
     draw_mode_banner(settings.mode)
+
+    st.sidebar.header("Automation")
+    ui_auto_run = st.sidebar.checkbox(
+        "UI auto-run (FULL_AUTO)",
+        value=True,
+        help="Automatically trigger cycles from UI. Backend still enforces risk rules.",
+    )
+    ui_auto_interval = st.sidebar.number_input(
+        "UI auto-run interval (seconds)",
+        min_value=5,
+        max_value=300,
+        value=15,
+        step=1,
+    )
+
+    if settings.mode == TradingMode.FULL_AUTO and ui_auto_run:
+        refresh_count = st_autorefresh(
+            interval=int(ui_auto_interval) * 1000,
+            key="full_auto_refresh",
+        )
+        last_handled_count = st.session_state.get("last_auto_refresh_count", -1)
+        if refresh_count != last_handled_count:
+            st.session_state["last_auto_refresh_count"] = refresh_count
+            try:
+                auto_result = engine.run_automatic_cycle()
+                if auto_result is not None:
+                    st.success(
+                        "Auto cycle: "
+                        f"{auto_result.signal.action.value} "
+                        f"(conf {auto_result.signal.confidence:.2f})"
+                    )
+                else:
+                    st.caption("Auto cycle: waiting for next closed candle")
+            except Exception as exc:  # noqa: BLE001
+                st.error(f"Auto cycle failed: {exc}")
 
     c1, c2, c3 = st.columns(3)
     with c1:
