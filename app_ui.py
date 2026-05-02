@@ -37,6 +37,11 @@ def sidebar_settings(current: RiskSettings) -> RiskSettings:
         [m.value for m in TradingMode],
         index=[m.value for m in TradingMode].index(current.mode.value),
     )
+    analyze_on_new_candle_only = st.sidebar.checkbox(
+        "Analyze only on new candle close",
+        value=current.analyze_on_new_candle_only,
+        help="Recommended for FULL_AUTO to reduce noise and API calls.",
+    )
     trading_enabled = st.sidebar.checkbox("Trading enabled", value=current.trading_enabled)
 
     max_risk_per_trade_pct = st.sidebar.number_input("Max risk per trade (%)", min_value=0.1, max_value=5.0, value=float(current.max_risk_per_trade_pct), step=0.1)
@@ -93,6 +98,7 @@ def sidebar_settings(current: RiskSettings) -> RiskSettings:
         atr_multiplier=atr_multiplier,
         take_profit_rr=take_profit_rr,
         max_spread_points=max_spread_points,
+        analyze_on_new_candle_only=analyze_on_new_candle_only,
         trading_enabled=trading_enabled,
         mode=TradingMode(mode),
     )
@@ -145,6 +151,7 @@ def main() -> None:
         {
             "emergency_stop": engine.state.emergency_stop,
             "mode": settings.mode.value,
+            "analyze_on_new_candle_only": settings.analyze_on_new_candle_only,
             "trading_enabled": settings.trading_enabled,
         }
     )

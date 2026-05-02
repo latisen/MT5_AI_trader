@@ -56,6 +56,7 @@ class TradingEngineState:
     emergency_stop: bool = False
     pending_proposal: TradeProposal | None = None
     last_result: CycleResult | None = None
+    last_closed_candle_ts: str | None = None
 
 
 class TradingEngine:
@@ -104,6 +105,31 @@ class TradingEngine:
             "volume_max": float(getattr(info, "volume_max", 100.0)),
             "volume_step": float(getattr(info, "volume_step", 0.01)),
         }
+
+    def _closed_candle_ts(self) -> str | None:
+        rates = self.mt5.get_rates(
+            symbol=self.settings.symbol,
+            timeframe=self.settings.timeframe,
+            count=3,
+        )
+        if len(rates) < 2:
+            return None
+        # Last row can be in-progress candle. Use previous as closed candle.
+        closed = rates.iloc[-2]["time"]
+        return closed.isoformat()
+
+    def run_automatic_cycle(self) -> CycleResult | None:
+        if (
+            self.settings.mode == TradingMode.FULL_AUTO
+            and self.settings.analyze_on_new_candle_only
+        ):
+            closed_ts = self._closed_candle_ts()
+            if closed_ts is None:
+                return None
+            if self.state.last_closed_candle_ts == closed_ts:
+                return None
+            self.state.last_closed_candle_ts = closed_ts
+        return self.analyze_once()
 
     def analyze_once(self) -> CycleResult:
         symbol = self.settings.symbol

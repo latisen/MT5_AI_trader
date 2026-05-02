@@ -62,6 +62,7 @@ class RiskSettings(BaseModel):
     atr_multiplier: float = Field(default=1.5, gt=0.1, le=20.0)
     take_profit_rr: float = Field(default=2.0, gt=0.1, le=20.0)
     max_spread_points: float = Field(default=30.0, gt=0.0, le=10000.0)
+    analyze_on_new_candle_only: bool = True
     trading_enabled: bool = False
     mode: TradingMode = TradingMode.SIGNAL_ONLY
 

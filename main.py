@@ -49,11 +49,14 @@ def run_cli() -> None:
 
     try:
         while True:
-            result = engine.analyze_once()
-            print(
-                f"[{result.timestamp.isoformat()}] action={result.signal.action.value} "
-                f"conf={result.signal.confidence:.2f} allowed={result.risk_decision.allowed}"
-            )
+            result = engine.run_automatic_cycle()
+            if result is not None:
+                print(
+                    f"[{result.timestamp.isoformat()}] action={result.signal.action.value} "
+                    f"conf={result.signal.confidence:.2f} allowed={result.risk_decision.allowed}"
+                )
+            elif engine.settings.mode.value == "FULL_AUTO" and engine.settings.analyze_on_new_candle_only:
+                print("Waiting for next closed candle...")
             time.sleep(cfg.loop_seconds)
     except KeyboardInterrupt:
         print("Stopped by user.")
