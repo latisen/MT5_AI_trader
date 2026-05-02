@@ -38,7 +38,7 @@ def _atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
         axis=1,
     ).max(axis=1)
 
-    return tr.rolling(window=period, min_periods=period).mean().fillna(method="bfill")
+    return tr.rolling(window=period, min_periods=period).mean().bfill()
 
 
 def _trend_label(ema20: float, ema50: float, ema200: float, close: float) -> str:
