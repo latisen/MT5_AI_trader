@@ -65,6 +65,11 @@ def load_config(env_file: str = ".env") -> AppConfig:
         timeframe=os.getenv("BOT_TIMEFRAME", "M15"),
         max_spread_points=_as_float("MAX_SPREAD_POINTS", 30.0),
         analyze_on_new_candle_only=_as_bool(os.getenv("ANALYZE_ON_NEW_CANDLE_ONLY"), default=True),
+        market_hours_enabled=_as_bool(os.getenv("MARKET_HOURS_ENABLED"), default=True),
+        market_open_day=os.getenv("MARKET_OPEN_DAY", "SUNDAY"),
+        market_open_time_utc=os.getenv("MARKET_OPEN_TIME_UTC", "22:05"),
+        market_close_day=os.getenv("MARKET_CLOSE_DAY", "FRIDAY"),
+        market_close_time_utc=os.getenv("MARKET_CLOSE_TIME_UTC", "21:55"),
         trading_enabled=_as_bool(os.getenv("TRADING_ENABLED"), default=False),
         mode=TradingMode(os.getenv("BOT_MODE", TradingMode.SIGNAL_ONLY.value).upper()),
     )

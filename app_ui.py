@@ -4,10 +4,21 @@ import pandas as pd
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
+from market_hours import format_countdown, get_market_clock
 from main import build_engine
 from models import RiskSettings, StopLossMethod, TradingMode
 
 st.set_page_config(page_title="MT5 AI Trader", layout="wide")
+
+WEEKDAYS = [
+    "MONDAY",
+    "TUESDAY",
+    "WEDNESDAY",
+    "THURSDAY",
+    "FRIDAY",
+    "SATURDAY",
+    "SUNDAY",
+]
 
 
 @st.cache_resource
@@ -86,6 +97,30 @@ def sidebar_settings(current: RiskSettings) -> RiskSettings:
         step=1.0,
     )
 
+    st.sidebar.header("Market Hours (UTC)")
+    market_hours_enabled = st.sidebar.checkbox(
+        "Pause when market is closed",
+        value=current.market_hours_enabled,
+    )
+    market_open_day = st.sidebar.selectbox(
+        "Market opens day",
+        WEEKDAYS,
+        index=WEEKDAYS.index(current.market_open_day) if current.market_open_day in WEEKDAYS else 6,
+    )
+    market_open_time_utc = st.sidebar.text_input(
+        "Market opens time (UTC, HH:MM)",
+        value=current.market_open_time_utc,
+    )
+    market_close_day = st.sidebar.selectbox(
+        "Market closes day",
+        WEEKDAYS,
+        index=WEEKDAYS.index(current.market_close_day) if current.market_close_day in WEEKDAYS else 4,
+    )
+    market_close_time_utc = st.sidebar.text_input(
+        "Market closes time (UTC, HH:MM)",
+        value=current.market_close_time_utc,
+    )
+
     return RiskSettings(
         symbol=symbol,
         timeframe=timeframe,
@@ -100,9 +135,34 @@ def sidebar_settings(current: RiskSettings) -> RiskSettings:
         take_profit_rr=take_profit_rr,
         max_spread_points=max_spread_points,
         analyze_on_new_candle_only=analyze_on_new_candle_only,
+        market_hours_enabled=market_hours_enabled,
+        market_open_day=market_open_day,
+        market_open_time_utc=market_open_time_utc,
+        market_close_day=market_close_day,
+        market_close_time_utc=market_close_time_utc,
         trading_enabled=trading_enabled,
         mode=TradingMode(mode),
     )
+
+
+def draw_market_clock(settings: RiskSettings) -> None:
+    clock = get_market_clock(settings)
+    status_text = "OPEN" if clock.is_open else "CLOSED"
+    countdown = format_countdown(clock.seconds_to_next_event)
+    next_label = "closes" if clock.next_event_type == "CLOSE" else "opens"
+
+    left, right = st.columns([2, 3])
+    with left:
+        if clock.is_open:
+            st.success(f"Market status: {status_text}")
+        else:
+            st.warning(f"Market status: {status_text}")
+    with right:
+        st.info(
+            f"Current UTC: {clock.now_utc.strftime('%Y-%m-%d %H:%M:%S')} | "
+            f"Next {next_label}: {clock.next_event_at_utc.strftime('%Y-%m-%d %H:%M:%S')} UTC | "
+            f"Countdown: {countdown}"
+        )
 
 
 def main() -> None:
@@ -114,6 +174,7 @@ def main() -> None:
     engine.set_settings(settings)
 
     draw_mode_banner(settings.mode)
+    draw_market_clock(settings)
 
     st.sidebar.header("Automation")
     ui_auto_run = st.sidebar.checkbox(
@@ -146,7 +207,10 @@ def main() -> None:
                         f"(conf {auto_result.signal.confidence:.2f})"
                     )
                 else:
-                    st.caption("Auto cycle: waiting for next closed candle")
+                    if engine.state.market_paused:
+                        st.caption("Auto cycle paused: market is closed")
+                    else:
+                        st.caption("Auto cycle: waiting for next closed candle")
             except Exception as exc:  # noqa: BLE001
                 st.error(f"Auto cycle failed: {exc}")
 
@@ -188,6 +252,8 @@ def main() -> None:
             "emergency_stop": engine.state.emergency_stop,
             "mode": settings.mode.value,
             "analyze_on_new_candle_only": settings.analyze_on_new_candle_only,
+            "market_hours_enabled": settings.market_hours_enabled,
+            "market_paused": engine.state.market_paused,
             "trading_enabled": settings.trading_enabled,
         }
     )

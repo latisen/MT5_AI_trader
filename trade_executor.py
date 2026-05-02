@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from market_hours import MarketClock, get_market_clock
 from models import CycleResult, RiskSettings, SignalAction, TradeProposal, TradingMode
 from mt5_client import MT5Client, OrderRequest
 from openai_signal import OpenAISignalEngine
@@ -57,6 +58,9 @@ class TradingEngineState:
     pending_proposal: TradeProposal | None = None
     last_result: CycleResult | None = None
     last_closed_candle_ts: str | None = None
+    market_clock: MarketClock | None = None
+    market_paused: bool = False
+    last_market_open_state: bool | None = None
 
 
 class TradingEngine:
@@ -119,6 +123,37 @@ class TradingEngine:
         return closed.isoformat()
 
     def run_automatic_cycle(self) -> CycleResult | None:
+        market_clock = get_market_clock(self.settings)
+        self.state.market_clock = market_clock
+        self.state.market_paused = not market_clock.is_open
+
+        market_state_changed = self.state.last_market_open_state != market_clock.is_open
+        self.state.last_market_open_state = market_clock.is_open
+
+        if not market_clock.is_open:
+            if market_state_changed:
+                self.logger.append(
+                    "market_closed_pause",
+                    {
+                        "now_utc": market_clock.now_utc.isoformat(),
+                        "next_event_type": market_clock.next_event_type,
+                        "next_event_at_utc": market_clock.next_event_at_utc.isoformat(),
+                        "seconds_to_next_event": market_clock.seconds_to_next_event,
+                    },
+                )
+            return None
+
+        if market_state_changed:
+            self.logger.append(
+                "market_reopened",
+                {
+                    "now_utc": market_clock.now_utc.isoformat(),
+                    "next_event_type": market_clock.next_event_type,
+                    "next_event_at_utc": market_clock.next_event_at_utc.isoformat(),
+                    "seconds_to_next_event": market_clock.seconds_to_next_event,
+                },
+            )
+
         if (
             self.settings.mode == TradingMode.FULL_AUTO
             and self.settings.analyze_on_new_candle_only

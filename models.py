@@ -63,6 +63,11 @@ class RiskSettings(BaseModel):
     take_profit_rr: float = Field(default=2.0, gt=0.1, le=20.0)
     max_spread_points: float = Field(default=30.0, gt=0.0, le=10000.0)
     analyze_on_new_candle_only: bool = True
+    market_hours_enabled: bool = True
+    market_open_day: str = "SUNDAY"
+    market_open_time_utc: str = "22:05"
+    market_close_day: str = "FRIDAY"
+    market_close_time_utc: str = "21:55"
     trading_enabled: bool = False
     mode: TradingMode = TradingMode.SIGNAL_ONLY
 
@@ -75,6 +80,24 @@ class RiskSettings(BaseModel):
     @classmethod
     def normalize_timeframe(cls, value: str) -> str:
         return value.strip().upper()
+
+    @field_validator("market_open_day", "market_close_day")
+    @classmethod
+    def normalize_weekday(cls, value: str) -> str:
+        return value.strip().upper()
+
+    @field_validator("market_open_time_utc", "market_close_time_utc")
+    @classmethod
+    def validate_hhmm(cls, value: str) -> str:
+        raw = value.strip()
+        parts = raw.split(":")
+        if len(parts) != 2:
+            raise ValueError("Time must be HH:MM")
+        hh = int(parts[0])
+        mm = int(parts[1])
+        if hh < 0 or hh > 23 or mm < 0 or mm > 59:
+            raise ValueError("Time must be HH:MM in 24h format")
+        return f"{hh:02d}:{mm:02d}"
 
 
 class AccountSnapshot(BaseModel):

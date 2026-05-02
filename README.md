@@ -82,6 +82,14 @@ Sakerhetsfokuserad trading-bot for MetaTrader 5 med OpenAI som signalanalytiker.
 - Riskmotor ar sista gate innan order.
 - Default startup i SIGNAL_ONLY.
 
+## Marknadstider och auto-paus
+- Auto-korning kan pausa analyser nar marknaden ar stangd.
+- UI visar aktuell UTC-tid, om marknaden ar oppen/stangd, och nedrakning till nasta open/close.
+- Styrs via:
+   - `MARKET_HOURS_ENABLED=true|false`
+   - `MARKET_OPEN_DAY`, `MARKET_OPEN_TIME_UTC`
+   - `MARKET_CLOSE_DAY`, `MARKET_CLOSE_TIME_UTC`
+
 ## Kom igang
 1. Installera Python 3.11+.
 2. Installera MT5 terminal i Windows och logga in pa demo-konto.
