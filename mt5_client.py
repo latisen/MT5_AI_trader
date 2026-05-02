@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import calendar
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Any
@@ -105,6 +106,34 @@ class MT5Client:
             total += float(getattr(deal, "commission", 0.0))
             total += float(getattr(deal, "swap", 0.0))
         return total
+
+    def get_daily_closed_pl(self, year: int, month: int, symbol: str | None = None) -> dict[str, float]:
+        _, month_days = calendar.monthrange(year, month)
+        start = datetime(year, month, 1)
+        end = datetime(year, month, month_days, 23, 59, 59)
+        deals = mt5.history_deals_get(start, end)
+        if deals is None:
+            return {}
+
+        out: dict[str, float] = {}
+        for deal in deals:
+            deal_symbol = str(getattr(deal, "symbol", ""))
+            if symbol and deal_symbol != symbol:
+                continue
+
+            profit = float(getattr(deal, "profit", 0.0))
+            commission = float(getattr(deal, "commission", 0.0))
+            swap = float(getattr(deal, "swap", 0.0))
+            realized = profit + commission + swap
+
+            # Skip pure zero rows to avoid noise.
+            if realized == 0.0:
+                continue
+
+            ts = datetime.utcfromtimestamp(int(getattr(deal, "time", 0)))
+            key = ts.strftime("%Y-%m-%d")
+            out[key] = out.get(key, 0.0) + realized
+        return out
 
     def get_positions(self, symbol: str | None = None) -> list[PositionSnapshot]:
         raw = mt5.positions_get(symbol=symbol) if symbol else mt5.positions_get()

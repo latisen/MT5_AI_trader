@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import calendar
+from datetime import UTC, datetime
+
 import pandas as pd
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
@@ -19,6 +22,8 @@ WEEKDAYS = [
     "SATURDAY",
     "SUNDAY",
 ]
+
+WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 
 @st.cache_resource
@@ -165,6 +170,104 @@ def draw_market_clock(settings: RiskSettings) -> None:
         )
 
 
+def _calendar_tile_style(value: float | None) -> str:
+    if value is None:
+        return "background:#f3f4f8;color:#8b90a0;"
+    if value > 0:
+        return "background:#d8f7df;color:#0b6b2f;border:1px solid #7ed692;"
+    if value < 0:
+        return "background:#ffe0e0;color:#8d1c1c;border:1px solid #f2a3a3;"
+    return "background:#f7f7f7;color:#5e6373;border:1px solid #dde1eb;"
+
+
+def draw_pnl_calendar(engine, symbol: str) -> None:
+    st.subheader("P/L Calendar")
+
+    now_utc = datetime.now(UTC)
+    if "calendar_year" not in st.session_state or "calendar_month" not in st.session_state:
+        st.session_state["calendar_year"] = now_utc.year
+        st.session_state["calendar_month"] = now_utc.month
+
+    nav1, nav2, nav3, nav4 = st.columns([1, 1, 1, 3])
+    with nav1:
+        if st.button("<- Prev month", key="prev_month"):
+            month = int(st.session_state["calendar_month"]) - 1
+            year = int(st.session_state["calendar_year"])
+            if month == 0:
+                month = 12
+                year -= 1
+            st.session_state["calendar_year"] = year
+            st.session_state["calendar_month"] = month
+    with nav2:
+        if st.button("This month", key="current_month"):
+            st.session_state["calendar_year"] = now_utc.year
+            st.session_state["calendar_month"] = now_utc.month
+    with nav3:
+        if st.button("Next month ->", key="next_month"):
+            month = int(st.session_state["calendar_month"]) + 1
+            year = int(st.session_state["calendar_year"])
+            if month == 13:
+                month = 1
+                year += 1
+            st.session_state["calendar_year"] = year
+            st.session_state["calendar_month"] = month
+
+    year = int(st.session_state["calendar_year"])
+    month = int(st.session_state["calendar_month"])
+
+    month_name = calendar.month_name[month]
+    st.markdown(f"### {month_name} {year}")
+
+    daily = engine.mt5.get_daily_closed_pl(year=year, month=month, symbol=symbol)
+
+    net = sum(daily.values()) if daily else 0.0
+    win_days = sum(1 for v in daily.values() if v > 0)
+    loss_days = sum(1 for v in daily.values() if v < 0)
+    active_days = len(daily)
+
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Month Net P/L", f"{net:.2f}")
+    m2.metric("Winning Days", str(win_days))
+    m3.metric("Losing Days", str(loss_days))
+    m4.metric("Active Days", str(active_days))
+
+    cal = calendar.Calendar(firstweekday=0)
+    weeks = cal.monthdayscalendar(year, month)
+
+    html = []
+    html.append(
+        "<style>"
+        ".pnl-cal-grid{display:grid;grid-template-columns:repeat(7,minmax(88px,1fr));gap:8px;margin-top:8px;}"
+        ".pnl-cal-head{font-weight:600;text-align:center;color:#3a3f4a;padding:6px 0;}"
+        ".pnl-cal-day{border-radius:12px;padding:8px;min-height:76px;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 1px 2px rgba(23,26,32,.08);}"
+        ".pnl-cal-date{font-size:12px;font-weight:700;}"
+        ".pnl-cal-value{font-size:13px;font-weight:700;}"
+        "</style>"
+    )
+    html.append("<div class='pnl-cal-grid'>")
+    for label in WEEKDAY_LABELS:
+        html.append(f"<div class='pnl-cal-head'>{label}</div>")
+
+    for week in weeks:
+        for day in week:
+            if day == 0:
+                html.append("<div class='pnl-cal-day' style='background:#f9fafc;border:1px solid #eef1f7;'></div>")
+                continue
+            key = f"{year:04d}-{month:02d}-{day:02d}"
+            value = daily.get(key)
+            style = _calendar_tile_style(value)
+            value_label = "-" if value is None else f"{value:+.2f}"
+            html.append(
+                "<div class='pnl-cal-day' style='" + style + "'>"
+                f"<div class='pnl-cal-date'>{day}</div>"
+                f"<div class='pnl-cal-value'>{value_label}</div>"
+                "</div>"
+            )
+    html.append("</div>")
+
+    st.markdown("".join(html), unsafe_allow_html=True)
+
+
 def main() -> None:
     st.title("MT5 AI Trader")
     st.caption("OpenAI as analyst. Python risk engine always controls order permission.")
@@ -285,6 +388,8 @@ def main() -> None:
         st.dataframe(pd.DataFrame(logs[::-1]))
     else:
         st.info("No logs yet")
+
+    draw_pnl_calendar(engine=engine, symbol=settings.symbol)
 
 
 if __name__ == "__main__":

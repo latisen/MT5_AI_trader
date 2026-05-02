@@ -90,6 +90,12 @@ Sakerhetsfokuserad trading-bot for MetaTrader 5 med OpenAI som signalanalytiker.
    - `MARKET_OPEN_DAY`, `MARKET_OPEN_TIME_UTC`
    - `MARKET_CLOSE_DAY`, `MARKET_CLOSE_TIME_UTC`
 
+## P/L kalender
+- UI visar en manadskalender med daglig realiserad P/L.
+- Dag med vinst markeras gron, dag med forlust markeras rod.
+- Du kan bladdra bakat/fram i manader for historik.
+- Summering visas for vald manad: net P/L, antal vinstdagar, forlustdagar, aktiva dagar.
+
 ## Kom igang
 1. Installera Python 3.11+.
 2. Installera MT5 terminal i Windows och logga in pa demo-konto.
